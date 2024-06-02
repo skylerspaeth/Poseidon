@@ -11,19 +11,23 @@
 # https://github.com/covertsh/ubuntu-autoinstall-generator
 # *****************************************************************************
 
+[[ -z "$1" ]] && echo -e "Missing YAML argument.\n\nUSAGE: ./generate-iso.sh autoinstall.yaml" && exit 1
+[[ -f "$1" ]] || { echo "Cannot find autoinstall file '${1}'." && exit 1 ; }
+
 set -Eeuo pipefail
 
 trap cleanup SIGINT SIGTERM ERR EXIT
 [[ ! -x "$(command -v date)" ]] && echo "💥 date command not found." && exit 1
 
 # export initial variables
-export_metadata() {
-  export EFI_IMAGE="ubuntu-original.efi"
-  export MBR_IMAGE="ubuntu-original.mbr"
-  export DESTINATION_ISO="ubuntu-autoinstall.iso"
-  export UBUNTU_GPG_KEY_ID="843938DF228D22F7B3742BC0D94AA3F0EFE21092"
-  export CODE_NAME="noble" # ubuntu 24
-}
+export CODE_NAME="noble" # ubuntu 24
+
+export EFI_IMAGE="ubuntu-original.efi"
+export MBR_IMAGE="ubuntu-original.mbr"
+export DESTINATION_ISO="poseidon-autoinstall-${CODE_NAME}.iso"
+
+export UBUNTU_GPG_KEY_ID="843938DF228D22F7B3742BC0D94AA3F0EFE21092"
+export USER_DATA_FILE="$1"
 
 # Create temporary directories for fie download and expansion
 create_tmp_dirs() {
@@ -151,11 +155,7 @@ set_kernel_autoinstall() {
   mkdir -p "${BUILD_DIR}/nocloud"
   cp "$USER_DATA_FILE" "${BUILD_DIR}/nocloud/user-data"
 
-  if [ -n "${META_DATA_FILE}" ]; then
-    cp "$META_DATA_FILE" "${BUILD_DIR}/nocloud/meta-data"
-  else
-    touch "${BUILD_DIR}/nocloud/meta-data"
-  fi
+  touch "${BUILD_DIR}/nocloud/meta-data"
 
   sed -i -e 's,---, ds=nocloud\\\;s=/cdrom/nocloud/  ---,g' "${BUILD_DIR}/boot/grub/grub.cfg"
   sed -i -e 's,---, ds=nocloud\\\;s=/cdrom/nocloud/  ---,g' "${BUILD_DIR}/boot/grub/loopback.cfg"
@@ -210,8 +210,13 @@ cleanup() {
     rm -rf "${TMP_DIR}"
     rm -rf "${BUILD_DIR}"
     log "🚽 Deleted temporary working directories:"
-    log "  - ${TMP_DIR}"
-    log "  - ${BUILD_DIR}"
+    log "  ➖ ${TMP_DIR}"
+    log "  ➖ ${BUILD_DIR}"
+  fi
+  if [ -f "${ORIGINAL_ISO}" ]; then
+    rm ${ORIGINAL_ISO}
+    log "🚽 Deleted original ISO:"
+    log "  ➖ ${ORIGINAL_ISO}"
   fi
 }
 
@@ -230,7 +235,6 @@ die() {
 
 
 main() {
-  export_metadata
   create_tmp_dirs
   verify_deps
   latest_release
