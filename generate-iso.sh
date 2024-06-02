@@ -18,16 +18,10 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 # export initial variables
 export_metadata() {
-  export ORIGINAL_ISO="ubuntu-original.iso"
   export EFI_IMAGE="ubuntu-original.efi"
   export MBR_IMAGE="ubuntu-original.mbr"
   export DESTINATION_ISO="ubuntu-autoinstall.iso"
-  export DEFAULT_TIMEOUT="30"
-  export TIMEOUT="${DEFAULT_TIMEOUT}"
   export UBUNTU_GPG_KEY_ID="843938DF228D22F7B3742BC0D94AA3F0EFE21092"
-  export ALL_IN_ONE=0
-  export USE_HWE_KERNEL=0
-  export USE_RELEASE_ISO=0
   export CODE_NAME="noble" # ubuntu 24
 }
 
@@ -75,7 +69,6 @@ latest_release() {
 
 # download the specified ISO
 download_iso() {
-
   if [ ! -f "${SOURCE_ISO}" ]; then
     log "🌎 Downloading ISO image for ${IMAGE_NAME} ..."
     wget --no-verbose \
@@ -152,34 +145,25 @@ set_kernel_autoinstall() {
   sed -i -e 's/---/ autoinstall  ---/g' "${BUILD_DIR}/boot/grub/grub.cfg"
   sed -i -e 's/---/ autoinstall  ---/g' "${BUILD_DIR}/boot/grub/loopback.cfg"
 
-  if [[ "${TIMEOUT}" != "${DEFAULT_TIMEOUT}" ]]; then
-    log "🧩 Setting grub timeout to ${TIMEOUT} sec ..."
-    sed -i -e "s/set timeout=30/set timeout=${TIMEOUT}/g" "${BUILD_DIR}/boot/grub/grub.cfg"
-    sed -i -e "s/set timeout=30/set timeout=${TIMEOUT}/g" "${BUILD_DIR}/boot/grub/loopback.cfg"
-    log "👍 Set grub timeout to ${TIMEOUT} sec."
-  fi
-
   log "👍 Added parameter to UEFI and BIOS kernel command lines."
 
-  if [ ${ALL_IN_ONE} -eq 1 ]; then
-    log "🧩 Adding user-data and meta-data files..."
-    mkdir -p "${BUILD_DIR}/nocloud"
-    cp "$USER_DATA_FILE" "${BUILD_DIR}/nocloud/user-data"
+  log "🧩 Adding user-data and meta-data files..."
+  mkdir -p "${BUILD_DIR}/nocloud"
+  cp "$USER_DATA_FILE" "${BUILD_DIR}/nocloud/user-data"
 
-    if [ -n "${META_DATA_FILE}" ]; then
-      cp "$META_DATA_FILE" "${BUILD_DIR}/nocloud/meta-data"
-    else
-      touch "${BUILD_DIR}/nocloud/meta-data"
-    fi
-
-    sed -i -e 's,---, ds=nocloud\\\;s=/cdrom/nocloud/  ---,g' "${BUILD_DIR}/boot/grub/grub.cfg"
-    sed -i -e 's,---, ds=nocloud\\\;s=/cdrom/nocloud/  ---,g' "${BUILD_DIR}/boot/grub/loopback.cfg"
-    log "👍 Added data and configured kernel command line."
+  if [ -n "${META_DATA_FILE}" ]; then
+    cp "$META_DATA_FILE" "${BUILD_DIR}/nocloud/meta-data"
+  else
+    touch "${BUILD_DIR}/nocloud/meta-data"
   fi
+
+  sed -i -e 's,---, ds=nocloud\\\;s=/cdrom/nocloud/  ---,g' "${BUILD_DIR}/boot/grub/grub.cfg"
+  sed -i -e 's,---, ds=nocloud\\\;s=/cdrom/nocloud/  ---,g' "${BUILD_DIR}/boot/grub/loopback.cfg"
+  log "👍 Added data and configured kernel command line."
 }
 
 # re-create the MD5 checksum data
-md5_checksums() {
+update_md5_checksums() {
   log "👷 Updating ${BUILD_DIR}/md5sum.txt with hashes of modified files..."
   md5=$(md5sum "${BUILD_DIR}/boot/grub/grub.cfg" | cut -f1 -d ' ')
   sed -i -e 's,^.*[[:space:]] ./boot/grub/grub.cfg,'"$md5"'  ./boot/grub/grub.cfg,' "${BUILD_DIR}/md5sum.txt"
@@ -223,9 +207,11 @@ reassemble_iso() {
 cleanup() {
   trap - SIGINT SIGTERM ERR EXIT
   if [ -n "${TMP_DIR+x}" ]; then
-    #rm -rf "${TMP_DIR}"
-    #rm -rf "${BUILD_DIR}"
-    log "🚽 Deleted temporary working directory ${TMP_DIR}"
+    rm -rf "${TMP_DIR}"
+    rm -rf "${BUILD_DIR}"
+    log "🚽 Deleted temporary working directories:"
+    log "  - ${TMP_DIR}"
+    log "  - ${BUILD_DIR}"
   fi
 }
 
@@ -252,7 +238,7 @@ main() {
   verify_gpg
   extract_images
   set_kernel_autoinstall
-  md5_checksums
+  update_md5_checksums
   reassemble_iso
   cleanup
 }
