@@ -2,7 +2,7 @@
 
 Poseidon is a tool to create an Ubuntu ISO which bundles in an `autoinstall.yaml`.
 
-<img width="60%" src="res/screenshot.png" alt="Screenshot of Poseidon in use">
+<img src="res/screenshot.png" alt="Screenshot of Poseidon in use">
 
 ## Usage
 First, run `build.sh` to generate the Docker image which `run.sh` uses.
